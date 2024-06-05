@@ -6,38 +6,69 @@
 
 #include "math/functions/multiply.hpp"
 
-inline bool does_converge(double a, double b, Expression *ex) {
+#define CRITICAL_SHIFT 1e-12
+
+template <typename T> int sign(T val) {
+  return (T(0) < val) - (val < T(0));
+}
+
+inline bool does_converge(double &a, double &b, Expression *ex) {
   if (a > b) {
     std::swap(a, b);
   }
   Expression *der = ex->derivative("x");
   Expression *checker = new Mult(ex, der);
 
+  std::unordered_map<std::string, double> value_a = {
+    {"x", a}
+  };
+  std::unordered_map<std::string, double> value_b = {
+    {"x", b}
+  };
+
+  if (std::isinf(ex->process(value_a)) || std::isnan(ex->process(value_a))) {
+    a += CRITICAL_SHIFT;
+  }
+
+  if (std::isinf(ex->process(value_b)) || std::isnan(ex->process(value_b))) {
+    b -= CRITICAL_SHIFT;
+  }
+
   const int steps = 1000;
   const double range = (b - a) / steps;
+  bool warn = false;
 
-  for (int it = 0; it < steps; ++it) {
+  for (int it = 0; it <= steps; ++it) {
     std::unordered_map<std::string, double> value_curr = {
-      {"x", it * range}
+      {"x", a + it * range}
     };
     std::unordered_map<std::string, double> value_next = {
-      {"x", it * range + range}
+      {"x", a + it * range + range}
     };
     double curr_v = ex->process(value_curr);
     double next_v = ex->process(value_next);
     double curr_c = checker->process(value_curr);
     double next_c = checker->process(value_next);
     if (curr_c * next_c < 0) {
-      if (std::abs(curr_v) > std::numeric_limits<double>::max() / 10) {
+      if (std::abs(curr_v) > std::numeric_limits<double>::max() / 100) {
+        warn = true;
+      }
+      if (std::abs(next_v) > std::numeric_limits<double>::max() / 100) {
+        warn = true;
+      }
+      if (std::abs(curr_v) > std::numeric_limits<double>::max() * 0.99) {
         return false;
       }
-      if (std::abs(next_v) > std::numeric_limits<double>::max() / 10) {
+      if (std::abs(next_v) > std::numeric_limits<double>::max() * 0.99) {
         return false;
       }
     }
     if (std::isinf(curr_v) || std::isnan(curr_v) || std::isinf(next_v) || std::isnan(next_v)) {
       return false;
     }
+  }
+  if (warn) {
+    std::cout << "Extremally large values are present on specified range: possibility of additional errors in computing" << std::endl;
   }
   return true;
 }
@@ -61,7 +92,7 @@ inline double calculate_left_rect(double a, double b, int n, Expression *ex, boo
   }
   if (output) {
     std::cout << "Result: " << res << std::endl;
-    std::cout << "Calculation error: " << std::abs(calculate_left_rect(a, b, 2 * n, ex, false) - res) / 3<< std::endl;
+    std::cout << "Calculation error: " << std::abs(calculate_left_rect(a, b, n / 2, ex, false) - res)<< std::endl;
   }
   return res;
 }
@@ -84,7 +115,7 @@ inline double calculate_cent_rect(double a, double b, int n, Expression *ex, boo
   }
   if (output) {
     std::cout << "Result: " << res << std::endl;
-    std::cout << "Calculation error: " << std::abs(calculate_cent_rect(a, b, 2 * n, ex, false) - res) / 3 << std::endl;
+    std::cout << "Calculation error: " << std::abs(calculate_cent_rect(a, b, n / 2, ex, false) - res) / 3 << std::endl;
   }
   return res;
 }
@@ -107,7 +138,7 @@ inline double calculate_right_rect(double a, double b, int n, Expression *ex, bo
   }
   if (output) {
     std::cout << "Result: " << res << std::endl;
-    std::cout << "Calculation error: " << std::abs(calculate_right_rect(a, b, 2 * n, ex, false) - res) / 3 << std::endl;
+    std::cout << "Calculation error: " << std::abs(calculate_right_rect(a, b, n / 2, ex, false) - res) << std::endl;
   }
   return res;
 }
@@ -135,7 +166,7 @@ inline double calculate_trapezia(double a, double b, int n, Expression *ex, bool
   }
   if (output) {
     std::cout << "Result: " << res << std::endl;
-    std::cout << "Calculation error: " << std::abs(calculate_trapezia(a, b, 2 * n, ex, false) - res) / 3 << std::endl;
+    std::cout << "Calculation error: " << std::abs(calculate_trapezia(a, b, n / 2, ex, false) - res) / 3 << std::endl;
   }
   return res;
 }
@@ -146,11 +177,7 @@ inline double calculate_simpson(double a, double b, int n, Expression *ex, bool 
   if (a > b) {
     std::swap(a, b);
   }
-  if (n % 2 != 0) {
-    n++;
-    if (output)
-      std::cout << "Adjusted number of intervals to " << n << " for Simpson's Rule" << std::endl;
-  }
+
   const double range = (b - a) / n;
   if (output)
     std::cout << "Range size: " << range << std::endl;
@@ -158,25 +185,24 @@ inline double calculate_simpson(double a, double b, int n, Expression *ex, bool 
   std::unordered_map<std::string, double> value = {
     {"x", a}
   };
-  const double f_0 = ex->process(value); // f(x0)
+  const double f_0 = ex->process(value) / 3 * range;
   value = {{"x", b}};
-  const double f_n = ex->process(value); // f(xn)
-
+  const double f_n = ex->process(value) / 3 * range;
   double sum_odd = 0, sum_even = 0;
   for (int i = 1; i < n; i++) {
     value = {{"x", a + i * range}};
-    const double f_x_i = ex->process(value);
+    const double f_x_i = ex->process(value) / 3 * range;
     if (i % 2 == 0) {
       sum_even += f_x_i;
     } else {
       sum_odd += f_x_i;
     }
   }
-  const double res = (range / 3) * (f_0 + 2 * sum_even + 4 * sum_odd + f_n);
+  const double res = f_0 + 2 * sum_even + 4 * sum_odd + f_n;
 
   if (output) {
     std::cout << "Result: " << res << std::endl;
-    std::cout << "Calculation error: " << std::abs(calculate_simpson(a, b, 2 * n, ex, false) - res) / 15 << std::endl;
+    std::cout << "Calculation error: " << std::abs(calculate_simpson(a, b, n / 2, ex, false) - res) / 15 << std::endl;
   }
   return res;
 }

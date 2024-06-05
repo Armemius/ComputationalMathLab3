@@ -63,7 +63,7 @@ void process_expression() {
   std::cout << "Enter interval count: ";
   std::cin >> n;
   if (!does_converge(a, b, eq)) {
-    std::cout << "It seems that integral does not converge in specified range" << std::endl;
+    std::cout << "It does not converge" << std::endl;
     return;
   }
   switch (selection) {
@@ -87,6 +87,7 @@ void process_expression() {
 }
 
 int main() {
+
   setlocale(LC_ALL, "rus");
   cls();
   std::string output;

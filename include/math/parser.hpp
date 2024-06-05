@@ -18,6 +18,7 @@
 #include "math/functions/plus.hpp"
 #include "constant.hpp"
 #include "variable.hpp"
+#include "functions/sqrt.hpp"
 #include "math/functions/unary_minus.hpp"
 
 template<typename Base, typename T>
@@ -81,7 +82,7 @@ Expression *parse(const std::string &ex) {
         }
         if (is_letter(ex[pos])) {
             std::string word = read_word(ex, pos);
-            if (word == "ln" || word == "cos" || word == "sin" || word == "tg") {
+            if (word == "ln" || word == "cos" || word == "sin" || word == "tg" || word == "sqrt") {
                 stack.emplace(word);
                 continue;
             }
@@ -126,7 +127,7 @@ Expression *parse(const std::string &ex) {
         }
         if (ex[pos] == '-' || ex[pos] == '+' || ex[pos] == '/' || ex[pos] == '*' || ex[pos] == '^') {
             while (!stack.empty() && (stack.top() == "u-" || stack.top() == "u+" || stack.top() == "ln" ||
-                                      stack.top() == "cos" || stack.top() == "sin" || stack.top() == "tg" ||
+                                      stack.top() == "cos" || stack.top() == "sin" || stack.top() == "sqrt" || stack.top() == "tg" ||
                                       ((stack.top() == "-" || stack.top() == "+" || stack.top() == "/" ||
                                         stack.top() == "*" ||
                                         stack.top() == "^") && priority[stack.top()[0]] <= priority[ex[pos]]))) {
@@ -152,7 +153,7 @@ Expression *parse(const std::string &ex) {
             continue;
         }
         if (is_letter(op[0]) &&
-            (op != "ln" && op != "cos" && op != "sin" && op != "tg" && op != "abs" && op != "u+" && op != "u-")) {
+            (op != "ln" && op != "cos" && op != "sin" && op != "tg" && op != "abs" && op != "sqrt" && op != "u+" && op != "u-")) {
             result_stack.push(new Var(op));
             continue;
         }
@@ -230,6 +231,12 @@ Expression *parse(const std::string &ex) {
             auto *a = result_stack.top();
             result_stack.pop();
             result_stack.push(new Ln(a));
+            continue;
+        }
+        if (op == "sqrt") {
+            auto *a = result_stack.top();
+            result_stack.pop();
+            result_stack.push(new Sqrt(a));
             continue;
         }
         if (op == "cos") {
